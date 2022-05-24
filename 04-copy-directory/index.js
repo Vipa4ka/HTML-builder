@@ -1,33 +1,50 @@
+const fs = require('fs');
 const path = require('path');
-
-
-const pathFile = path.join(__dirname, 'files');
 const pathCopy = path.join(__dirname, 'files-copy');
-const { mkdir, readdir, unlink, copyFile } = require('fs/promises');
-
-const copyFolder = () => mkdir(pathCopy, { recursive: true });
+const pathFile = path.join(__dirname, 'files');
 
 
-
-const copyFilesFirst = () => {
-  readdir(pathFile).then(el => {
-    el.forEach(el => {
-      const pathToFile = path.join(pathFile, el);
-      copyFile(pathToFile, path.join(pathCopy, el));
-    });
+const copyFiles = () => {
+  fs.readdir(pathFile, { withFileTypes: true }, (error, files) => {
+    if (error) console.error(error);
+    else {
+      files.forEach((el) => {
+        if (!el.isDirectory()) {
+          fs.promises.copyFile(
+            path.join(pathFile, el.name),
+            path.join(pathCopy, el.name)
+          );
+        }
+      });
+    }
   });
 };
 
-const cleaning = () => {
-  readdir(pathCopy).then(el => {
-    el.forEach(el => {
-      const pathToFile = path.join(pathCopy, el);
-      unlink(pathToFile);
-    });
-  });
-};
+fs.mkdir(pathCopy, { recursive: true }, (error) => {
+  if (error) return console.error(error);
 
-copyFolder()
-  .then(() => cleaning())
-  .then(() => copyFilesFirst())
-  .catch(error => {throw error;});
+  fs.readdir(pathCopy, { withFileTypes: true }, (error, files) => {
+    if (error) return console.error(error);
+    const cleaning = [];
+    files.forEach((file) => {
+      cleaning.push(
+        new Promise((res, rej) => {
+          fs.unlink(path.join(pathCopy, file.name), (error) => {
+            if (error) {
+              rej(error);
+              console.error(error);
+            } else {
+              res();
+            }
+          });
+        })
+      );
+    });
+
+    Promise.all(cleaning).then(copyFiles);
+  });
+});
+
+
+
+
